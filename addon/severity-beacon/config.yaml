@@ -1,0 +1,45 @@
+name: Severity Beacon Lights
+version: "0.1.0"
+slug: severity_beacon
+description: >-
+  Poll Zabbix problem.get (Severity_Beacon semantics) and set a Home Assistant
+  RGB light from the highest open problem severity. Inspired by
+  https://github.com/sgevents-sam/Severity_Beacon — uses HA lights instead of
+  WERMA serial beacons.
+url: https://github.com/sgevents-sam/Severity_Beacon
+arch:
+  - amd64
+  - aarch64
+  - armv7
+  - armhf
+init: false
+startup: application
+boot: manual
+homeassistant_api: true
+hassio_api: false
+stdin: true
+map: []
+options:
+  zabbix_url: "https://zabbix.example.com"
+  zabbix_api_token: ""
+  light_entity_id: "light.koti_office_strip_led"
+  poll_interval_seconds: 45
+  host_group_id: ""
+  severities: "2,3,4,5"
+  brightness: 255
+  color_none: "0,255,0"
+  color_low: "255,140,0"
+  color_high: "255,0,0"
+  high_severity_threshold: 4
+schema:
+  zabbix_url: url
+  zabbix_api_token: password
+  light_entity_id: str
+  poll_interval_seconds: int(5,3600)
+  host_group_id: str?
+  severities: str
+  brightness: int(1,255)
+  color_none: str
+  color_low: str
+  color_high: str
+  high_severity_threshold: int(0,5)

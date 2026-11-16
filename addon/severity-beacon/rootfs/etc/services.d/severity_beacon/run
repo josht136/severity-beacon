@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Severity Beacon Lights — start polling loop
+# ==============================================================================
+set -euo pipefail
+
+bashio::log.info "Starting Severity Beacon Lights"
+
+exec python3 /usr/bin/severity_beacon.py

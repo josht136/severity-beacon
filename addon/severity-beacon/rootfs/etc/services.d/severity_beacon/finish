@@ -1,0 +1,10 @@
+#!/usr/bin/with-contenv bashio
+# ==============================================================================
+# Severity Beacon Lights — service finish
+# ==============================================================================
+if [[ "${1:-0}" -ne 0 ]] && [[ "${1:-0}" -ne 256 ]]; then
+  bashio::log.warning "Service crashed with exit ${1}"
+  exec s6-svscanctl -t /var/run/s6/services
+fi
+
+exit 0

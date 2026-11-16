@@ -1,0 +1,5 @@
+# Home Assistant Supervisor custom add-on repository metadata.
+# DO NOT add this repository to a live HA host until you have snapshotted the VM.
+name: Homeass local add-ons
+url: https://github.com/local/homeass
+maintainer: koti <koti@local>
