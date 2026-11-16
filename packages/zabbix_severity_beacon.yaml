@@ -1,0 +1,114 @@
+# Home Assistant package — Severity_Beacon-style Zabbix poll → office Strip LED
+#
+# Install:
+#   1. Paste API key into /config/secrets.yaml (see secrets.yaml.example)
+#   2. Copy this file to /config/packages/zabbix_severity_beacon.yaml
+#   3. Ensure configuration.yaml has:
+#        homeassistant:
+#          packages: !include_dir_named packages
+#      (or merge the rest:/template:/automation: blocks into configuration.yaml)
+#   4. Developer Tools → YAML → Check configuration → Restart
+#
+# Behavior (ported from https://github.com/sgevents-sam/Severity_Beacon):
+#   - Poll problem.get every 45s (unacknowledged, unsuppressed)
+#   - Highest open severity wins
+#   - No problems → green; severity 0–3 → orange; 4–5 → red
+#   - Existing webhook automation.zabbix_led_status may remain as a secondary path
+
+rest:
+  - resource: https://zabbix.koti.tech/api_jsonrpc.php
+    method: POST
+    timeout: 30
+    scan_interval: 45
+    headers:
+      Content-Type: application/json
+      Authorization: !secret zabbix_api_authorization
+    # Same filters as Severity_Beacon: acknowledged=false, suppressed=false.
+    # Severities 2–5 match Severity_Beacon defaults (warning/average/high/disaster).
+    # Omit hostids so all hosts are included; add "hostids": ["..."] to scope like -g.
+    payload: >-
+      {"jsonrpc":"2.0","method":"problem.get","params":{"acknowledged":false,"suppressed":false,"severities":[2,3,4,5],"output":["eventid","severity","name","acknowledged","suppressed"],"sortfield":["eventid"],"sortorder":"DESC"},"id":1}
+    sensor:
+      - name: Zabbix max severity
+        unique_id: zabbix_max_severity
+        # -1 = no open problems (all-clear / green)
+        value_template: >-
+          {% set problems = value_json.result if value_json is mapping and value_json.result is defined else [] %}
+          {% if problems | length == 0 %}
+            -1
+          {% else %}
+            {{ problems | map(attribute='severity') | map('int') | max }}
+          {% endif %}
+        unit_of_measurement: sev
+        json_attributes_path: "$"
+        json_attributes:
+          - result
+          - error
+
+template:
+  - sensor:
+      - name: Zabbix LED color
+        unique_id: zabbix_led_color
+        state: >-
+          {% set sev = states('sensor.zabbix_max_severity') | int(-99) %}
+          {% if sev < 0 %}
+            green
+          {% elif sev >= 4 %}
+            red
+          {% else %}
+            orange
+          {% endif %}
+        icon: mdi:led-strip-variant
+        attributes:
+          max_severity: "{{ states('sensor.zabbix_max_severity') }}"
+          mapping: "none→green; 0–3→orange; 4–5→red (Severity_Beacon poll)"
+
+automation:
+  - id: zabbix_severity_beacon_led
+    alias: Zabbix Severity Beacon LED
+    description: >-
+      Primary cloud-Zabbix path — poll max open problem severity and set
+      light.koti_office_strip_led (Severity_Beacon logic, HA strip instead of WERMA).
+    mode: queued
+    trigger:
+      - platform: state
+        entity_id: sensor.zabbix_led_color
+      - platform: homeassistant
+        event: start
+      - platform: time_pattern
+        # Re-assert color periodically in case the light was changed manually
+        minutes: "/5"
+    condition:
+      - condition: template
+        value_template: "{{ states('sensor.zabbix_led_color') in ['green', 'orange', 'red'] }}"
+    action:
+      - choose:
+          - conditions:
+              - condition: state
+                entity_id: sensor.zabbix_led_color
+                state: green
+            sequence:
+              - service: light.turn_on
+                target:
+                  entity_id: light.koti_office_strip_led
+                data:
+                  rgb_color: [0, 255, 0]
+                  brightness: 255
+          - conditions:
+              - condition: state
+                entity_id: sensor.zabbix_led_color
+                state: red
+            sequence:
+              - service: light.turn_on
+                target:
+                  entity_id: light.koti_office_strip_led
+                data:
+                  rgb_color: [255, 0, 0]
+                  brightness: 255
+        default:
+          - service: light.turn_on
+            target:
+              entity_id: light.koti_office_strip_led
+            data:
+              rgb_color: [255, 140, 0]
+              brightness: 255

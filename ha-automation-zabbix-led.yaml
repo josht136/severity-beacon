@@ -1,0 +1,55 @@
+# Paste into HA or POST to /api/config/automation/config/zabbix_led_status
+# Webhook URL: http://10.203.3.120/api/webhook/zabbix_led_status
+id: zabbix_led_status
+alias: Zabbix LED status
+description: Set office Strip LED color from Zabbix alert severity/status via webhook
+mode: queued
+trigger:
+  - platform: webhook
+    webhook_id: zabbix_led_status
+    allowed_methods:
+      - POST
+    local_only: true
+condition: []
+action:
+  - variables:
+      raw_severity: "{{ trigger.json.get('severity', trigger.json.get('Severity', '')) | string | lower }}"
+      raw_status: "{{ trigger.json.get('status', trigger.json.get('Status', '')) | string | lower }}"
+      raw_value: "{{ trigger.json.get('value', trigger.json.get('Value', '')) | string }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ raw_status in ['ok', 'resolved', '0']
+                 or raw_value == '0'
+                 or 'ok' in raw_severity
+                 or 'resolved' in raw_severity
+                 or 'recover' in raw_status }}
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: light.koti_office_strip_led
+            data:
+              rgb_color: [0, 255, 0]
+              brightness: 255
+      - conditions:
+          - condition: template
+            value_template: >-
+              {{ raw_severity in ['high', 'disaster', 'critical', '4', '5']
+                 or 'high' in raw_severity
+                 or 'disaster' in raw_severity
+                 or 'critical' in raw_severity }}
+        sequence:
+          - service: light.turn_on
+            target:
+              entity_id: light.koti_office_strip_led
+            data:
+              rgb_color: [255, 0, 0]
+              brightness: 255
+    default:
+      - service: light.turn_on
+        target:
+          entity_id: light.koti_office_strip_led
+        data:
+          rgb_color: [255, 140, 0]
+          brightness: 255

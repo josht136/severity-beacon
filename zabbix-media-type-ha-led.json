@@ -1,0 +1,26 @@
+{
+  "name": "Home Assistant LED strip",
+  "type": "webhook",
+  "parameters": [
+    {
+      "name": "url",
+      "value": "http://10.203.3.120/api/webhook/zabbix_led_status"
+    },
+    {
+      "name": "severity",
+      "value": "{TRIGGER.SEVERITY}"
+    },
+    {
+      "name": "status",
+      "value": "{TRIGGER.STATUS}"
+    },
+    {
+      "name": "value",
+      "value": "{EVENT.VALUE}"
+    }
+  ],
+  "script": "try {\n    var params = JSON.parse(value);\n    var req = new HttpRequest();\n    req.addHeader('Content-Type: application/json');\n    var body = JSON.stringify({\n        severity: params.severity,\n        status: params.status,\n        value: params.value\n    });\n    var resp = req.post(params.url, body);\n    if (req.getStatus() < 200 || req.getStatus() >= 300) {\n        throw 'HA webhook HTTP ' + req.getStatus() + ': ' + resp;\n    }\n    return 'OK ' + req.getStatus();\n} catch (error) {\n    throw 'Home Assistant LED media type failed: ' + error;\n}",
+  "timeout": "10s",
+  "description": "Posts severity/status/value to HA webhook zabbix_led_status. No HA token required. Green=OK/resolved, orange=warning/average/info, red=high/disaster/critical.",
+  "_import_notes": "Zabbix Admin → Alerts → Media types → Import (or create Webhook and paste script + parameters). Attach to a user used by actions. Adjust macros if your Zabbix edition differs. Prefer this over calling light.turn_on with a long-lived token."
+}
