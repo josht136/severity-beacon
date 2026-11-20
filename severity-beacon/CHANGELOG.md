@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2
+
+- Desk-button helpers (full suppress, audio only, lights only) are checked every second on their own loop. A press speaks and applies within about that second, instead of waiting for the Zabbix poll.
+- Zabbix still uses `poll_interval_seconds`. An in-progress pattern or recovery stops painting when lights or full suppress is on.
+
 ## 0.8.1
 
 - Spoken confirmations and the Ingress status line say **suppressed** instead of muted: "Lights and audio suppressed.", "Audio suppressed.", "Lights suppressed."

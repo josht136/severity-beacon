@@ -7,6 +7,7 @@ import logging
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable
@@ -25,6 +26,9 @@ TIER_KEYS = (
 )
 
 _mute_lock = threading.Lock()
+# Set when full suppress or lights suppress changes, so the Zabbix loop can
+# stop painting without waiting for poll_interval_seconds.
+_controls_event = threading.Event()
 _mute_state: dict[str, Any] = {
     "muted": False,
     "muted_at_severity": None,
@@ -325,6 +329,41 @@ def fetch_ha_states(ha_api: str, token: str) -> list[dict[str, Any]]:
     return data if isinstance(data, list) else []
 
 
+def signal_controls_changed() -> None:
+    """Wake the Zabbix loop after a lights or full-suppress change."""
+    _controls_event.set()
+
+
+def controls_changed() -> bool:
+    return _controls_event.is_set()
+
+
+def consume_controls_changed() -> bool:
+    if not _controls_event.is_set():
+        return False
+    _controls_event.clear()
+    return True
+
+
+def fetch_entity_states(ha_api: str, token: str, entity_ids: list[str]) -> list[dict[str, Any]]:
+    """Fetch only the listed entities. Used by the 1s button loop."""
+    out: list[dict[str, Any]] = []
+    for eid in entity_ids:
+        url = f"{ha_api}/states/{urllib.parse.quote(eid, safe='._')}"
+        try:
+            data = http_json(url, headers=ha_headers(token), timeout=4)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                log.debug("button state %s failed: %s", eid, exc)
+            continue
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as exc:
+            log.debug("button state %s failed: %s", eid, exc)
+            continue
+        if isinstance(data, dict):
+            out.append(data)
+    return out
+
+
 def filter_entities(
     states: list[dict[str, Any]],
     domains: list[str] | None = None,
@@ -389,13 +428,18 @@ def poll_button_groups(
     token: str,
     groups: list[tuple[list[str], Callable[[str], None]]],
 ) -> None:
-    """Edge-detect several button lists with one Home Assistant states fetch."""
-    if not any(entities for entities, _callback in groups):
+    """Edge-detect button lists by reading only those entities."""
+    wanted: list[str] = []
+    seen: set[str] = set()
+    for entities, _callback in groups:
+        for eid in entities:
+            if eid not in seen:
+                seen.add(eid)
+                wanted.append(eid)
+    if not wanted:
         return
-    try:
-        states = fetch_ha_states(ha_api, token)
-    except Exception as exc:  # noqa: BLE001
-        log.debug("mute poll states failed: %s", exc)
+    states = fetch_entity_states(ha_api, token, wanted)
+    if not states and wanted:
         return
     for entities, callback in groups:
         poll_mute_buttons(ha_api, token, entities, callback, states=states)

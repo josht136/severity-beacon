@@ -147,7 +147,7 @@ Assign Home Assistant `button`, `input_button`, or `event` helpers in the Ingres
 | Audio only | Alert audio stays off until the same button is pressed again. Lights keep following severity. |
 | Lights only | The strip goes to Base once, then the beacon stops sending light commands so a scene can hold. Press again to resume severity colours. |
 
-Every one of those presses speaks a short line through the configured media player and TTS entity, including when alert audio is muted.
+Every one of those presses speaks a short line through the configured media player and TTS entity, including when alert audio is muted. The three helpers are checked about once a second, on their own loop. Zabbix still uses `poll_interval_seconds`.
 
 ## Logs & troubleshooting
 

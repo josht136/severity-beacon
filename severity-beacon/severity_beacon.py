@@ -32,6 +32,8 @@ try:
         check_mute_timeout,
         clear_audio_fire,
         clear_mute,
+        consume_controls_changed,
+        controls_changed,
         fetch_ha_states,
         filter_entities,
         get_mute_snapshot,
@@ -48,6 +50,7 @@ try:
         set_lights_rgb,
         set_lights_suppressed,
         set_muted,
+        signal_controls_changed,
         speak_button_status,
         stop_media_player,
         targets_for_severity,
@@ -61,6 +64,8 @@ except ImportError:  # when installed as /usr/bin/severity_beacon.py
         check_mute_timeout,
         clear_audio_fire,
         clear_mute,
+        consume_controls_changed,
+        controls_changed,
         fetch_ha_states,
         filter_entities,
         get_mute_snapshot,
@@ -77,6 +82,7 @@ except ImportError:  # when installed as /usr/bin/severity_beacon.py
         set_lights_rgb,
         set_lights_suppressed,
         set_muted,
+        signal_controls_changed,
         speak_button_status,
         stop_media_player,
         targets_for_severity,
@@ -215,6 +221,15 @@ KEY_TO_SEV: dict[str, int | None] = {
 
 # Sentinel returned when recovery is aborted for a pending Test request
 _RECOVERY_ABORTED_TEST = object()
+# Sentinel returned when lights or full suppress takes the lights mid-recovery
+_RECOVERY_ABORTED_HELD = object()
+
+# Button helpers are watched on this cadence, separate from poll_interval_seconds.
+BUTTON_POLL_SECONDS = 1.0
+
+# Main-loop light writes no-op while lights are held. The button thread sets
+# this so its own Base restore still goes out.
+_force_lights = threading.local()
 
 
 def load_options() -> dict[str, Any]:
@@ -1208,8 +1223,18 @@ def alert_body_for_severity(
     return format_alert_bodies(problems or [])
 
 
+def lights_output_allowed() -> bool:
+    """Severity paints stop while lights are held. Button Base restore opts in."""
+    if getattr(_force_lights, "on", False):
+        return True
+    return not lights_commands_held()
+
+
 def set_light_rgb(entity_id: str | list[str], rgb: list[int], brightness: int) -> None:
     """Set one or more lights. RGB 0,0,0 (or brightness 0) turns lights off."""
+    if not lights_output_allowed():
+        log.debug("light command skipped: lights held")
+        return
     if not SUPERVISOR_TOKEN:
         raise RuntimeError("SUPERVISOR_TOKEN is not set (are we running as an HA add-on?)")
     entities = [entity_id] if isinstance(entity_id, str) else list(entity_id)
@@ -1379,6 +1404,8 @@ def recovery_wait_interruptible(
     end = time.monotonic() + max(0.0, seconds)
     next_poll = time.monotonic()
     while time.monotonic() < end:
+        if lights_commands_held():
+            return _RECOVERY_ABORTED_HELD
         if peek_test_pending():
             return _RECOVERY_ABORTED_TEST
         now = time.monotonic()
@@ -1393,6 +1420,8 @@ def recovery_wait_interruptible(
                 return sev
         time.sleep(min(0.2, max(0.0, end - time.monotonic())))
     # Final check before declaring clear
+    if lights_commands_held():
+        return _RECOVERY_ABORTED_HELD
     if peek_test_pending():
         return _RECOVERY_ABORTED_TEST
     try:
@@ -1430,6 +1459,10 @@ def run_recovery(
         fade_s,
         base,
     )
+    if lights_commands_held():
+        log.info("recovery skipped: lights held")
+        return _RECOVERY_ABORTED_HELD
+
     set_light_rgb(entity, rec, brightness)
 
     if hold_s > 0:
@@ -1443,6 +1476,8 @@ def run_recovery(
         steps = max(4, int(fade_s / 0.15))
         step_sleep = fade_s / steps
         for i in range(1, steps + 1):
+            if lights_commands_held():
+                return _RECOVERY_ABORTED_HELD
             if peek_test_pending():
                 return _RECOVERY_ABORTED_TEST
             try:
@@ -1474,16 +1509,19 @@ def sleep_chunk(
     *,
     until: float | None = None,
     abort_on_test: bool = True,
+    abort_on_controls: bool = False,
 ) -> bool:
     """
-    Sleep up to `seconds`, honouring optional deadline and pending Test.
-    Returns True if aborted early (deadline or test).
+    Sleep up to `seconds`, honouring optional deadline, pending Test, and a
+    lights/full-suppress change. Returns True if aborted early.
     """
     end = time.monotonic() + max(0.0, seconds)
     if until is not None:
         end = min(end, until)
     while time.monotonic() < end:
         if abort_on_test and peek_test_pending():
+            return True
+        if abort_on_controls and (controls_changed() or lights_commands_held()):
             return True
         if until is not None and time.monotonic() >= until:
             return True
@@ -1500,6 +1538,7 @@ def fade_to(
     *,
     until: float | None = None,
     abort_on_test: bool = True,
+    abort_on_controls: bool = False,
 ) -> list[int]:
     """Smooth fade start→target over fade_s; returns last colour set."""
     if fade_s <= 0.05 or start == target:
@@ -1518,9 +1557,16 @@ def fade_to(
             return last
         if abort_on_test and peek_test_pending():
             return last
+        if abort_on_controls and (controls_changed() or lights_commands_held()):
+            return last
         last = lerp_rgb(start, target, i / steps)
         set_light_rgb(entity, last, brightness)
-        if sleep_chunk(step_sleep, until=until, abort_on_test=abort_on_test):
+        if sleep_chunk(
+            step_sleep,
+            until=until,
+            abort_on_test=abort_on_test,
+            abort_on_controls=abort_on_controls,
+        ):
             return last
     return list(target)
 
@@ -1540,6 +1586,7 @@ def play_pattern_loop(
     *,
     until: float | None = None,
     abort_on_test: bool = True,
+    abort_on_controls: bool = False,
     prev_rgb: list[int] | None = None,
 ) -> list[int]:
     """
@@ -1555,6 +1602,8 @@ def play_pattern_loop(
         if until is not None and time.monotonic() >= until:
             return prev
         if abort_on_test and peek_test_pending():
+            return prev
+        if abort_on_controls and (controls_changed() or lights_commands_held()):
             return prev
         step = steps[idx % len(steps)]
         target = list(step["rgb"])
@@ -1572,13 +1621,21 @@ def play_pattern_loop(
                 fade_s,
                 until=until,
                 abort_on_test=abort_on_test,
+                abort_on_controls=abort_on_controls,
             )
+            if abort_on_controls and (controls_changed() or lights_commands_held()):
+                return prev
         else:
             set_light_rgb(ents, target, brightness)
             prev = target
 
         if hold > 0:
-            if sleep_chunk(hold, until=until, abort_on_test=abort_on_test):
+            if sleep_chunk(
+                hold,
+                until=until,
+                abort_on_test=abort_on_test,
+                abort_on_controls=abort_on_controls,
+            ):
                 return prev
         idx += 1
         # Continuous with no deadline: one full cycle per call is fine when
@@ -1595,10 +1652,16 @@ def active_lights_for(opts: dict[str, Any], sev: int | None) -> list[str]:
 
 
 def restore_registry_to_base(opts: dict[str, Any], brightness: int, colors: dict[str, list[int]]) -> None:
+    """Send Base even while lights are held. Severity paints do not use this."""
     registry = registry_lights(opts)
     base = colors.get("base") or colors.get("none") or DEFAULT_BASE_COLOR
-    if registry:
+    if not registry:
+        return
+    _force_lights.on = True
+    try:
         set_light_rgb(registry, base, brightness)
+    finally:
+        _force_lights.on = False
 
 
 def full_mute_release_phrase(snap: dict[str, Any]) -> str:
@@ -1641,6 +1704,7 @@ def apply_lights_toggle(opts: dict[str, Any], brightness: int, colors: dict[str,
         snap = set_lights_suppressed(True)
         restore_registry_to_base(opts, brightness, colors)
         announce_button(opts, "Lights suppressed.")
+    signal_controls_changed()
     update_runtime_status()
     return snap
 
@@ -1657,6 +1721,7 @@ def apply_full_mute(opts: dict[str, Any], brightness: int, colors: dict[str, lis
     else:
         snap = clear_mute()
         announce_button(opts, full_mute_release_phrase(snap))
+    signal_controls_changed()
     update_runtime_status()
     return snap
 
@@ -1676,6 +1741,8 @@ def apply_severity_enter(
     For all-clear (sev is None) this only applies Base — Recovery is handled
     separately when transitioning from an active alert.
     """
+    if lights_commands_held():
+        return
     opts = opts or {}
     registry = registry_lights(opts) if opts else (
         [entity] if isinstance(entity, str) else list(entity)
@@ -1729,7 +1796,17 @@ def apply_severity_enter(
         window,
     )
     deadline = time.monotonic() + window
-    play_pattern_loop(active, brightness, steps, until=deadline, abort_on_test=True)
+    play_pattern_loop(
+        active,
+        brightness,
+        steps,
+        until=deadline,
+        abort_on_test=True,
+        abort_on_controls=True,
+    )
+    if lights_commands_held() or controls_changed():
+        log.info("pattern settle skipped: lights held")
+        return
     rgb = settle_color_for(sev, colors)
     set_light_rgb(active, rgb, brightness)
     log.info("settle severity=%s → rgb=%s", label, rgb)
@@ -1744,6 +1821,8 @@ def refresh_steady(
     windows: dict[str, float],
 ) -> None:
     """Re-assert settle/steady colour when severity unchanged (skip looping patterns)."""
+    if lights_commands_held():
+        return
     if sev is None:
         set_light_rgb(entity, colors.get("base") or colors["none"], brightness)
         return
@@ -1769,7 +1848,7 @@ def wait_until_next_poll(
 ) -> None:
     """Sleep for poll interval; window=0 patterns keep cycling through the wait."""
     if sev is None:
-        sleep_until(time.monotonic() + interval, abort_on_test=True)
+        sleep_until(time.monotonic() + interval, abort_on_test=True, abort_on_controls=True)
         return
 
     key = tier_key_for(sev)
@@ -1785,11 +1864,12 @@ def wait_until_next_poll(
             steps,
             until=deadline,
             abort_on_test=True,
+            abort_on_controls=True,
             prev_rgb=list(steps[0]["rgb"]),
         )
         return
 
-    sleep_until(deadline, abort_on_test=True)
+    sleep_until(deadline, abort_on_test=True, abort_on_controls=True)
 
 
 def poll_once(opts: dict[str, Any]) -> tuple[int | None, str]:
@@ -1860,9 +1940,18 @@ def peek_test_pending() -> bool:
         return _test_request is not None
 
 
-def sleep_until(deadline: float, *, abort_on_test: bool = False) -> None:
+def sleep_until(
+    deadline: float,
+    *,
+    abort_on_test: bool = False,
+    abort_on_controls: bool = False,
+) -> None:
     while time.monotonic() < deadline:
         if abort_on_test and peek_test_pending():
+            return
+        # Event only. Also treating "already held" as a wake would busy-loop
+        # the suppress path, which sleeps here between Zabbix polls.
+        if abort_on_controls and controls_changed():
             return
         time.sleep(min(0.25, max(0.0, deadline - time.monotonic())))
 
@@ -1884,6 +1973,8 @@ def run_severity_test(
     """Preview one severity's current mode (or Recovery→Base) on the light."""
     secs = max(1.0, min(MAX_TEST_SECONDS, float(seconds)))
     deadline = time.monotonic() + secs
+    # Ingress Test still previews lights while a channel is held.
+    _force_lights.on = True
 
     if kind == "recovery":
         log.info("TEST start recovery for ≤%.1fs → %s", secs, entity)
@@ -1914,6 +2005,7 @@ def run_severity_test(
             log.exception("TEST failed recovery")
             raise
         finally:
+            _force_lights.on = False
             log.info("TEST done recovery — returning to live polling")
         return
 
@@ -1976,6 +2068,7 @@ def run_severity_test(
         log.exception("TEST failed severity=%s", label)
         raise
     finally:
+        _force_lights.on = False
         log.info("TEST done severity=%s — returning to live polling", label)
 
 
@@ -2009,7 +2102,7 @@ MIME = {
 
 
 class IngressHandler(BaseHTTPRequestHandler):
-    server_version = "SeverityBeacon/0.8.1"
+    server_version = "SeverityBeacon/0.8.2"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         log.debug("ingress %s - %s", self.address_string(), fmt % args)
@@ -2239,7 +2332,7 @@ def main() -> int:
 
     log.info(
         "Polling Zabbix every %ss → lights %s via %s "
-        "(multi-light, mute, audio, lights, base/recovery, Ingress 0.8)",
+        "(multi-light, mute, audio, lights, base/recovery, Ingress 0.8.2)",
         interval,
         lights,
         HA_API,
@@ -2279,6 +2372,31 @@ def main() -> int:
             "muted" if snap.get("lights_suppressed") else "enabled",
         )
 
+    def button_groups() -> list[tuple[list[str], Any]]:
+        current = get_options_cache() or opts
+        return [
+            (parse_entity_list(current.get("mute_entities")), on_mute_press),
+            (parse_entity_list(current.get("audio_toggle_entities")), on_audio_press),
+            (parse_entity_list(current.get("lights_toggle_entities")), on_lights_press),
+        ]
+
+    def watch_buttons() -> None:
+        log.info(
+            "Button helpers polled every %.0fs; Zabbix stays on its own interval",
+            BUTTON_POLL_SECONDS,
+        )
+        while True:
+            try:
+                if check_mute_timeout():
+                    signal_controls_changed()
+                if SUPERVISOR_TOKEN:
+                    poll_button_groups(HA_API, SUPERVISOR_TOKEN, button_groups())
+            except Exception as exc:  # noqa: BLE001
+                log.debug("button poll failed: %s", exc)
+            time.sleep(BUTTON_POLL_SECONDS)
+
+    threading.Thread(target=watch_buttons, name="buttons", daemon=True).start()
+
     while True:
         try:
             if OPTIONS_PATH.is_file():
@@ -2305,18 +2423,9 @@ def main() -> int:
                         )
                     last_mtime = mtime
 
-            # Mute button edge detection + timeout
-            check_mute_timeout()
-            if SUPERVISOR_TOKEN:
-                poll_button_groups(
-                    HA_API,
-                    SUPERVISOR_TOKEN,
-                    [
-                        (parse_entity_list(opts.get("mute_entities")), on_mute_press),
-                        (parse_entity_list(opts.get("audio_toggle_entities")), on_audio_press),
-                        (parse_entity_list(opts.get("lights_toggle_entities")), on_lights_press),
-                    ],
-                )
+            # Presses are handled on the button thread. Clear the wake so this
+            # iteration's Zabbix wait is not skipped, then honour the new hold.
+            consume_controls_changed()
             held_now = lights_commands_held()
             if was_lights_held and not held_now:
                 last_sev = object()  # beacon may paint severity colours again
@@ -2387,7 +2496,10 @@ def main() -> int:
                         )
                         maybe_notify(HA_API, SUPERVISOR_TOKEN, opts, sev, label)
                     last_sev = sev
-                time.sleep(min(2.0, float(interval)))
+                sleep_until(
+                    time.monotonic() + min(2.0, float(interval)),
+                    abort_on_controls=True,
+                )
                 continue
 
             if muted:
@@ -2401,9 +2513,15 @@ def main() -> int:
                                 HA_API, SUPERVISOR_TOKEN, opts, "none", force=True
                             )
                         last_sev = None
-                        time.sleep(min(2.0, float(interval)))
+                        sleep_until(
+                            time.monotonic() + min(2.0, float(interval)),
+                            abort_on_controls=True,
+                        )
                         continue
                     result = run_recovery(opts, lights, brightness, recovery)
+                    if result is _RECOVERY_ABORTED_HELD:
+                        last_sev = None
+                        continue
                     if opts.get("audio_recovery_chime") and not alert_audio_blocked():
                         play_severity_audio(
                             HA_API, SUPERVISOR_TOKEN, opts, "none", force=True
@@ -2422,7 +2540,10 @@ def main() -> int:
                         pass
                     elif last_sev != sev and isinstance(sev, int):
                         last_sev = sev  # track severity while muted without lighting
-                    time.sleep(min(2.0, float(interval)))
+                    sleep_until(
+                        time.monotonic() + min(2.0, float(interval)),
+                        abort_on_controls=True,
+                    )
                 continue
 
             escalate_only = bool(opts.get("escalate_only"))
@@ -2444,6 +2565,9 @@ def main() -> int:
                 prior_was_alert = isinstance(last_sev, int)
                 if sev is None and prior_was_alert:
                     result = run_recovery(opts, lights, brightness, recovery)
+                    if result is _RECOVERY_ABORTED_HELD:
+                        last_sev = None
+                        continue
                     if opts.get("audio_recovery_chime") and not alert_audio_blocked():
                         play_severity_audio(
                             HA_API, SUPERVISOR_TOKEN, opts, "none", force=True
@@ -2520,7 +2644,7 @@ def main() -> int:
             ValueError,
         ) as exc:
             log.error("%s", exc)
-            time.sleep(interval)
+            sleep_until(time.monotonic() + interval, abort_on_controls=True)
 
     return 0
 
