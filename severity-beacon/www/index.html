@@ -68,7 +68,7 @@
       </div>
       <p class="hint">
         Press a configured button during an alert to restore Base lighting.
-        Higher severity than the muted level auto-unmutes. Clear while muted plays Recovery → Base.
+        Higher severity than the suppressed level clears it. Clear while suppressed plays Recovery → Base.
         Window <code>0</code> on mute timeout = never (minutes).
       </p>
       <div id="mute-pills" class="pill-box" data-field="mute_entities"></div>
@@ -81,7 +81,7 @@
       <h3>Audio only</h3>
       <p class="hint">
         Toggle alert speech and media. Stays off until this button is pressed again.
-        A higher severity does not turn it back on. The press speaks the change even while audio is muted.
+        A higher severity does not turn it back on. The press speaks the change even while audio is suppressed.
       </p>
       <div class="head-actions">
         <button type="button" class="btn ghost" id="btn-audio-toggle">Toggle audio</button>
@@ -102,7 +102,7 @@
 
     <section class="panel">
       <h2>Audio</h2>
-      <p class="hint">Optional sounds via a Home Assistant media_player and/or TTS. Per severity, tick <em>Read Zabbix alert body</em> for <em>Message - Host - Problem</em>; related alerts summarize as <em>Host … along with N others</em> (host strips trailing 6 hex MAC chars only). Mute silences live audio; Test still speaks. Quiet hours skip Info/Warning audio.</p>
+      <p class="hint">Optional sounds via a Home Assistant media_player and/or TTS. Per severity, tick <em>Read Zabbix alert body</em> for <em>Message - Host - Problem</em>; related alerts summarize as <em>Host … along with N others</em> (host strips trailing 6 hex MAC chars only). Suppressed audio stays silent; Test still speaks. Quiet hours skip Info/Warning audio.</p>
       <div class="grid-2">
         <label class="check">
           <input type="checkbox" id="audio_enabled" />

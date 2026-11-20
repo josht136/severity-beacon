@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.1
+
+- Spoken confirmations and the Ingress status line say **suppressed** instead of muted: "Lights and audio suppressed.", "Audio suppressed.", "Lights suppressed."
+
 ## 0.8.0
 
 - **Audio mute** — a button toggles alert audio only. It stays off until that same button is pressed again. A higher severity does not turn it back on.

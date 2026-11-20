@@ -13,7 +13,8 @@ LABEL \
     io.hass.name="Severity Beacon Lights" \
     io.hass.description="Zabbix severity → Home Assistant RGB lights" \
     io.hass.type="addon" \
-    io.hass.version="0.8.0"
+    io.hass.version="0.8.1"
 # build 1794917803
 # build 1794917931
 # build 0.8.0
+# build 0.8.1

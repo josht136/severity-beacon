@@ -706,9 +706,9 @@ function renderLiveStatus(status) {
   const el = document.getElementById("live-status");
   if (!el || !status) return;
   const sev = status.severity == null ? "none" : status.severity;
-  const full = status.muted ? `muted@${status.muted_at_severity}` : "live";
-  const lightsHold = status.lights_suppressed ? "muted" : "live";
-  const audioHold = status.audio_suppressed ? "muted" : "live";
+  const full = status.muted ? `suppressed@${status.muted_at_severity}` : "live";
+  const lightsHold = status.lights_suppressed ? "suppressed" : "live";
+  const audioHold = status.audio_suppressed ? "suppressed" : "live";
   el.textContent = `Status: severity=${sev} · full=${full} · lights=${lightsHold} · audio=${audioHold}`;
 }
 

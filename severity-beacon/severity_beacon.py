@@ -1627,7 +1627,7 @@ def apply_audio_toggle(opts: dict[str, Any]) -> dict[str, Any]:
         snap = set_audio_suppressed(True)
         clear_audio_fire()
         stop_media_player(HA_API, SUPERVISOR_TOKEN, opts)
-        announce_button(opts, "Audio muted.")
+        announce_button(opts, "Audio suppressed.")
     update_runtime_status()
     return snap
 
@@ -1640,7 +1640,7 @@ def apply_lights_toggle(opts: dict[str, Any], brightness: int, colors: dict[str,
     else:
         snap = set_lights_suppressed(True)
         restore_registry_to_base(opts, brightness, colors)
-        announce_button(opts, "Lights muted.")
+        announce_button(opts, "Lights suppressed.")
     update_runtime_status()
     return snap
 
@@ -1653,7 +1653,7 @@ def apply_full_mute(opts: dict[str, Any], brightness: int, colors: dict[str, lis
         restore_registry_to_base(opts, brightness, colors)
         clear_audio_fire()
         stop_media_player(HA_API, SUPERVISOR_TOKEN, opts)
-        announce_button(opts, "Lights and audio muted.")
+        announce_button(opts, "Lights and audio suppressed.")
     else:
         snap = clear_mute()
         announce_button(opts, full_mute_release_phrase(snap))
@@ -2009,7 +2009,7 @@ MIME = {
 
 
 class IngressHandler(BaseHTTPRequestHandler):
-    server_version = "SeverityBeacon/0.8.0"
+    server_version = "SeverityBeacon/0.8.1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
         log.debug("ingress %s - %s", self.address_string(), fmt % args)
@@ -2126,7 +2126,7 @@ class IngressHandler(BaseHTTPRequestHandler):
                 opts = get_options_cache()
                 colors = load_colors(opts)
                 snap = apply_full_mute(opts, int(opts.get("brightness") or 255), colors, enable=True)
-                self._json(200, {"ok": True, "mute": snap, "message": "Lights and audio muted."})
+                self._json(200, {"ok": True, "mute": snap, "message": "Lights and audio suppressed."})
             except Exception as exc:  # noqa: BLE001
                 self._json(400, {"ok": False, "error": str(exc)})
             return
@@ -2151,7 +2151,7 @@ class IngressHandler(BaseHTTPRequestHandler):
                     {
                         "ok": True,
                         "mute": snap,
-                        "message": "Audio muted." if held else "Audio enabled.",
+                        "message": "Audio suppressed." if held else "Audio enabled.",
                     },
                 )
             except Exception as exc:  # noqa: BLE001
@@ -2169,7 +2169,7 @@ class IngressHandler(BaseHTTPRequestHandler):
                     {
                         "ok": True,
                         "mute": snap,
-                        "message": "Lights muted." if held else "Lights enabled.",
+                        "message": "Lights suppressed." if held else "Lights enabled.",
                     },
                 )
             except Exception as exc:  # noqa: BLE001
