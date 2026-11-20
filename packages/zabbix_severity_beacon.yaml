@@ -1,4 +1,7 @@
-# Home Assistant package — Severity_Beacon-style Zabbix poll → office Strip LED
+# OPTIONAL — HA-native REST poll (no add-on).
+# Simple / current recommended path is the local script:
+#   severity_beacon_ha.py + severity_beacon_ha.env
+# Use this package only if you want HA itself to poll Zabbix instead of the script.
 #
 # Install:
 #   1. Paste API key into /config/secrets.yaml (see secrets.yaml.example)
@@ -16,7 +19,7 @@
 #   - Existing webhook automation.zabbix_led_status may remain as a secondary path
 
 rest:
-  - resource: https://zabbix.koti.tech/api_jsonrpc.php
+  - resource: https://zabbix.example.com/api_jsonrpc.php
     method: POST
     timeout: 30
     scan_interval: 45
@@ -24,10 +27,11 @@ rest:
       Content-Type: application/json
       Authorization: !secret zabbix_api_authorization
     # Same filters as Severity_Beacon: acknowledged=false, suppressed=false.
-    # Severities 2–5 match Severity_Beacon defaults (warning/average/high/disaster).
+    # Severities 1–5 include Information (common for Link down) plus warning–disaster.
+    # Upstream Severity_Beacon CLI defaults to 2–5 only; we intentionally include 1.
     # Omit hostids so all hosts are included; add "hostids": ["..."] to scope like -g.
     payload: >-
-      {"jsonrpc":"2.0","method":"problem.get","params":{"acknowledged":false,"suppressed":false,"severities":[2,3,4,5],"output":["eventid","severity","name","acknowledged","suppressed"],"sortfield":["eventid"],"sortorder":"DESC"},"id":1}
+      {"jsonrpc":"2.0","method":"problem.get","params":{"acknowledged":false,"suppressed":false,"severities":[1,2,3,4,5],"output":["eventid","severity","name","acknowledged","suppressed"],"sortfield":["eventid"],"sortorder":"DESC"},"id":1}
     sensor:
       - name: Zabbix max severity
         unique_id: zabbix_max_severity

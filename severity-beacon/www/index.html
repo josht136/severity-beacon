@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Severity Beacon Settings</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Severity Beacon</h1>
+      <p class="sub">Multi-light alerts, mute, audio mute, lights mute, Base/Recovery, Steady | Pattern</p>
+      <p id="live-status" class="live-status" aria-live="polite">Status: …</p>
+    </div>
+    <div class="top-actions">
+      <span id="status" class="status" aria-live="polite"></span>
+      <button type="button" id="btn-reload" class="btn ghost">Reload</button>
+      <button type="button" id="btn-save" class="btn primary">Save</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Connection</h2>
+      <p class="hint">Zabbix API. Token is only updated if you type a new value.</p>
+      <div class="grid-2">
+        <label>Zabbix URL
+          <input type="url" id="zabbix_url" autocomplete="off" />
+        </label>
+        <label>Zabbix API token
+          <input type="password" id="zabbix_api_token" placeholder="•••• leave blank to keep" autocomplete="new-password" />
+        </label>
+        <label>Poll interval (s)
+          <input type="number" id="poll_interval_seconds" min="5" max="3600" step="1" />
+        </label>
+        <label>Host group ID
+          <input type="text" id="host_group_id" placeholder="optional" />
+        </label>
+        <label>Severities
+          <input type="text" id="severities" />
+        </label>
+        <label>Brightness (1–255)
+          <input type="number" id="brightness" min="1" max="255" step="1" />
+        </label>
+        <label class="check">
+          <input type="checkbox" id="escalate_only" />
+          Escalate only (re-fire patterns/audio mainly when severity rises)
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Lights</h2>
+      <p class="hint">Registry of lights / groups used for alerting. Per-severity and per-pattern-step targets pick from this list.</p>
+      <div id="lights-pills" class="pill-box" data-field="lights"></div>
+      <input type="hidden" id="lights" />
+      <input type="hidden" id="light_entity_id" />
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Mute buttons</h2>
+        <div class="head-actions">
+          <button type="button" class="btn ghost" id="btn-mute">Mute now</button>
+          <button type="button" class="btn ghost" id="btn-unmute">Unmute</button>
+        </div>
+      </div>
+      <p class="hint">
+        Press a configured button during an alert to restore Base lighting.
+        Higher severity than the muted level auto-unmutes. Clear while muted plays Recovery → Base.
+        Window <code>0</code> on mute timeout = never (minutes).
+      </p>
+      <div id="mute-pills" class="pill-box" data-field="mute_entities"></div>
+      <input type="hidden" id="mute_entities" />
+      <div class="grid-2">
+        <label>Mute timeout (minutes, 0 = until clear/higher)
+          <input type="number" id="mute_timeout_minutes" min="0" max="1440" step="1" />
+        </label>
+      </div>
+      <h3>Audio only</h3>
+      <p class="hint">
+        Toggle alert speech and media. Stays off until this button is pressed again.
+        A higher severity does not turn it back on. The press speaks the change even while audio is muted.
+      </p>
+      <div class="head-actions">
+        <button type="button" class="btn ghost" id="btn-audio-toggle">Toggle audio</button>
+      </div>
+      <div id="audio-pills" class="pill-box" data-field="audio_toggle_entities"></div>
+      <input type="hidden" id="audio_toggle_entities" />
+      <h3>Lights only</h3>
+      <p class="hint">
+        Sets the strip to Base once, then stops sending light commands so a scene can take over.
+        Stays off until this button is pressed again. No alert colours and no Recovery while it is held.
+      </p>
+      <div class="head-actions">
+        <button type="button" class="btn ghost" id="btn-lights-toggle">Toggle lights</button>
+      </div>
+      <div id="lights-mute-pills" class="pill-box" data-field="lights_toggle_entities"></div>
+      <input type="hidden" id="lights_toggle_entities" />
+    </section>
+
+    <section class="panel">
+      <h2>Audio</h2>
+      <p class="hint">Optional sounds via a Home Assistant media_player and/or TTS. Per severity, tick <em>Read Zabbix alert body</em> for <em>Message - Host - Problem</em>; related alerts summarize as <em>Host … along with N others</em> (host strips trailing 6 hex MAC chars only). Mute silences live audio; Test still speaks. Quiet hours skip Info/Warning audio.</p>
+      <div class="grid-2">
+        <label class="check">
+          <input type="checkbox" id="audio_enabled" />
+          Enable audio alerts
+        </label>
+        <label class="check">
+          <input type="checkbox" id="audio_recovery_chime" />
+          Play recovery chime on clear
+        </label>
+        <label>Default media player
+          <input type="text" id="audio_media_player" list="dl-media" placeholder="media_player.…" />
+        </label>
+        <label>TTS entity (optional)
+          <input type="text" id="audio_tts_entity" list="dl-tts" placeholder="tts.…" />
+        </label>
+        <label>Volume (0–1)
+          <input type="number" id="audio_volume" min="0" max="1" step="0.05" />
+        </label>
+        <label>Quiet hours start (HH:MM)
+          <input type="text" id="quiet_hours_start" placeholder="22:00" />
+        </label>
+        <label>Quiet hours end (HH:MM)
+          <input type="text" id="quiet_hours_end" placeholder="07:00" />
+        </label>
+        <label>Notify service (High/Disaster)
+          <input type="text" id="notify_service" placeholder="notify.mobile_app_…" />
+        </label>
+        <label>Notify on severities
+          <input type="text" id="notify_on_severities" placeholder="4,5" />
+        </label>
+      </div>
+      <datalist id="dl-media"></datalist>
+      <datalist id="dl-tts"></datalist>
+      <datalist id="dl-lights"></datalist>
+      <datalist id="dl-mute"></datalist>
+    </section>
+
+    <section class="panel" id="base-recovery">
+      <div class="panel-head">
+        <h2>Base &amp; Recovery</h2>
+        <div class="head-actions">
+          <button type="button" class="btn test-btn" id="btn-test-recovery" title="Preview recovery→base (~8s)">Test recovery</button>
+        </div>
+      </div>
+      <p class="hint">
+        <em>Base</em> is idle (no problems). When alerts clear, show <em>Recovery</em>, then Base.
+        RGB <code>0,0,0</code> turns lights <strong>off</strong>.
+      </p>
+      <div class="color-row" id="row-base" data-role="base">
+        <div class="name">Base colour</div>
+        <input type="color" id="color_base_picker" aria-label="Base colour" />
+        <input type="text" id="color_base" spellcheck="false" />
+      </div>
+      <div class="color-row" id="row-recovery" data-role="recovery">
+        <div class="name">Recovery colour</div>
+        <input type="color" id="color_recovery_picker" aria-label="Recovery colour" />
+        <input type="text" id="color_recovery" spellcheck="false" />
+      </div>
+      <div class="grid-2 recovery-timing" id="recovery-timing">
+        <label>Recovery hold (s)
+          <input type="number" id="recovery_hold_seconds" min="0" max="60" step="0.1" />
+        </label>
+        <label>Then to Base
+          <select id="recovery_transition">
+            <option value="fade">Fade</option>
+            <option value="snap">Snap</option>
+          </select>
+        </label>
+        <label class="fade-only" id="recovery-fade-wrap">Recovery fade (s)
+          <input type="number" id="recovery_fade_seconds" min="0" max="60" step="0.05" />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel modes-legend">
+      <h2>Alert severities</h2>
+      <p class="hint">
+        Steady = one colour. Pattern = steps with snap/fade; window 0 loops until cleared or a higher severity wins.
+        Choose which registry lights each severity (and each pattern step) affects.
+      </p>
+    </section>
+
+    <div id="severity-panels"></div>
+  </main>
+
+  <footer>
+    <p>
+      Mute from automations:
+      <code>POST /api/mute</code> / <code>POST /api/unmute</code>,
+      <code>POST /api/audio/toggle</code>,
+      <code>POST /api/lights/toggle</code>
+      on this add-on Ingress. Saves hot-reload from <code>options.json</code>.
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

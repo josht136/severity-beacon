@@ -1,0 +1,172 @@
+configuration:
+  zabbix_url:
+    name: Zabbix URL
+    description: Base URL of the Zabbix frontend (api_jsonrpc.php is appended if missing).
+  zabbix_api_token:
+    name: Zabbix API token
+    description: Bearer API token (User → API tokens). Prefer a read-only token.
+  light_entity_id:
+    name: Light entity
+    description: Home Assistant light entity_id to control (must support rgb_color).
+  poll_interval_seconds:
+    name: Poll interval (seconds)
+    description: How often to call Zabbix problem.get. Prefer Open Web UI for modes/colors/patterns.
+  host_group_id:
+    name: Host group ID (optional)
+    description: Optional Zabbix host group id. Empty = all hosts.
+  severities:
+    name: Severities
+    description: Comma-separated Zabbix severity numbers (default 0,1,2,3,4,5).
+  brightness:
+    name: Brightness
+    description: Light brightness 1–255 when setting color.
+  color_base:
+    name: Base colour
+    description: Idle RGB when no problems (default white). Prefer Open Web UI.
+  color_recovery:
+    name: Recovery colour
+    description: Brief RGB after alerts clear, before Base. Prefer Open Web UI.
+  recovery_hold_seconds:
+    name: Recovery hold (seconds)
+    description: How long to hold Recovery colour. Prefer Open Web UI.
+  recovery_fade_seconds:
+    name: Recovery fade (seconds)
+    description: Fade duration when recovery_transition is fade. Prefer Open Web UI.
+  recovery_transition:
+    name: Recovery transition
+    description: fade or snap from Recovery to Base. Prefer Open Web UI.
+  color_none:
+    name: Color — none (legacy / synced with Base)
+    description: Kept aligned with color_base. Prefer Open Web UI Base colour.
+  color_none_alt:
+    name: Color — none (alt)
+    description: Legacy alt RGB. Prefer Open Web UI.
+  color_unclassified:
+    name: Color — severity 0 (primary)
+    description: Primary RGB for Not classified. Prefer Open Web UI.
+  color_unclassified_alt:
+    name: Color — severity 0 (alt)
+    description: Alt RGB for default Not classified pattern. Prefer Open Web UI.
+  color_info:
+    name: Color — severity 1 (primary)
+    description: Primary RGB for Information. Prefer Open Web UI.
+  color_info_alt:
+    name: Color — severity 1 (alt / settle)
+    description: Settle RGB after Information pattern (default green). Prefer Open Web UI.
+  color_warning:
+    name: Color — severity 2 (primary)
+    description: Primary RGB for Warning. Prefer Open Web UI.
+  color_warning_alt:
+    name: Color — severity 2 (alt)
+    description: Alt RGB for default Warning pattern. Prefer Open Web UI.
+  color_average:
+    name: Color — severity 3 (primary)
+    description: Primary RGB for Average. Prefer Open Web UI.
+  color_average_alt:
+    name: Color — severity 3 (alt)
+    description: Alt RGB for default Average pattern. Prefer Open Web UI.
+  color_high:
+    name: Color — severity 4 (primary)
+    description: Primary RGB for High. Prefer Open Web UI.
+  color_high_alt:
+    name: Color — severity 4 (alt)
+    description: Alt RGB for default High pattern. Prefer Open Web UI.
+  color_disaster:
+    name: Color — severity 5 (primary)
+    description: Primary RGB for Disaster. Prefer Open Web UI.
+  color_disaster_alt:
+    name: Color — severity 5 (alt)
+    description: Alt RGB for default Disaster pattern. Prefer Open Web UI.
+  mode_none:
+    name: Mode — none
+    description: steady or pattern. Prefer Open Web UI.
+  mode_unclassified:
+    name: Mode — severity 0
+    description: Default pattern. Prefer Open Web UI.
+  mode_info:
+    name: Mode — severity 1
+    description: Default pattern. Prefer Open Web UI.
+  mode_warning:
+    name: Mode — severity 2
+    description: Default steady. Prefer Open Web UI.
+  mode_average:
+    name: Mode — severity 3
+    description: Default steady. Prefer Open Web UI.
+  mode_high:
+    name: Mode — severity 4
+    description: Default steady. Prefer Open Web UI.
+  mode_disaster:
+    name: Mode — severity 5
+    description: Default pattern (window 0). Prefer Open Web UI.
+  window_none:
+    name: Window — none (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_unclassified:
+    name: Window — severity 0 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_info:
+    name: Window — severity 1 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_warning:
+    name: Window — severity 2 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_average:
+    name: Window — severity 3 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_high:
+    name: Window — severity 4 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  window_disaster:
+    name: Window — severity 5 (s)
+    description: Pattern window; 0 = until resolved. Prefer Open Web UI.
+  pattern_none:
+    name: Pattern — none (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_unclassified:
+    name: Pattern — severity 0 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_info:
+    name: Pattern — severity 1 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_warning:
+    name: Pattern — severity 2 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_average:
+    name: Pattern — severity 3 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_high:
+    name: Pattern — severity 4 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  pattern_disaster:
+    name: Pattern — severity 5 (JSON)
+    description: Prefer Open Web UI pattern maker.
+  period_none:
+    name: Legacy period — none (s)
+    description: Mapped to window_none when unset. Prefer Open Web UI.
+  unclassified_flash_seconds:
+    name: Legacy period — severity 0 (s)
+    description: Mapped to window_unclassified when unset. Prefer Open Web UI.
+  info_hold_seconds:
+    name: Legacy info hold (s)
+    description: Used for default Information pattern / window. Prefer Open Web UI.
+  info_fade_seconds:
+    name: Legacy info fade (s)
+    description: Used for default Information pattern / window. Prefer Open Web UI.
+  period_warning:
+    name: Legacy period — severity 2 (s)
+    description: Mapped to window_warning when unset. Prefer Open Web UI.
+  period_average:
+    name: Legacy period — severity 3 (s)
+    description: Mapped to window_average when unset. Prefer Open Web UI.
+  period_high:
+    name: Legacy period — severity 4 (s)
+    description: Mapped to window_high when unset. Prefer Open Web UI.
+  disaster_fade_seconds:
+    name: Legacy period — severity 5 (s)
+    description: Used for default Disaster fade step timing. Prefer Open Web UI.
+  audio_toggle_entities:
+    name: Audio mute buttons
+    description: Comma-separated button entities. Toggles alert audio until pressed again. Prefer Open Web UI.
+  lights_toggle_entities:
+    name: Lights mute buttons
+    description: Comma-separated button entities. Sets Base once, then leaves the lights alone until pressed again. Prefer Open Web UI.

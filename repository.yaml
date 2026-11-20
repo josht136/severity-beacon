@@ -1,5 +1,5 @@
-# Home Assistant Supervisor custom add-on repository metadata.
-# DO NOT add this repository to a live HA host until you have snapshotted the VM.
-name: Homeass local add-ons
-url: https://github.com/local/homeass
-maintainer: koti <koti@local>
+# Home Assistant Supervisor add-on repository.
+# Add this GitHub URL under Settings → Add-ons → Add-on store → Repositories.
+name: Severity Beacon Lights
+url: https://github.com/josht136/severity-beacon
+maintainer: josht136

@@ -6,7 +6,7 @@
 #
 set -euo pipefail
 
-HA_BASE="${HA_BASE:-http://10.203.3.120}"
+HA_BASE="${HA_BASE:-http://homeassistant.local}"
 ENTITY="${ENTITY:-light.koti_office_strip_led}"
 WEBHOOK_URL="${WEBHOOK_URL:-$HA_BASE/api/webhook/zabbix_led_status}"
 

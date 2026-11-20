@@ -1,5 +1,5 @@
 # Paste into HA or POST to /api/config/automation/config/zabbix_led_status
-# Webhook URL: http://10.203.3.120/api/webhook/zabbix_led_status
+# Webhook URL: http://homeassistant.local/api/webhook/zabbix_led_status
 id: zabbix_led_status
 alias: Zabbix LED status
 description: Set office Strip LED color from Zabbix alert severity/status via webhook

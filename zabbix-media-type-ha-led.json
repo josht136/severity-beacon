@@ -4,7 +4,7 @@
   "parameters": [
     {
       "name": "url",
-      "value": "http://10.203.3.120/api/webhook/zabbix_led_status"
+      "value": "http://homeassistant.local/api/webhook/zabbix_led_status"
     },
     {
       "name": "severity",
